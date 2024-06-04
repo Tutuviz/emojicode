@@ -22,7 +22,7 @@ token_specification = [
     ('OPERATION_OR', r'😘🤨'),
     ('OPERATION', r'♊|♓|🐜|🐘|🐜🐞|🐘🦣'),
     ('EXPRESSION', r'🤰|🔫'),
-    ('TERM', r'🙅‍♂️|🇦🇴'),
+    ('TERM', r'🙅|🇦🇴'),
     ('WHILE_LOOP', r'🐳'),
     ('FOR_LOOP', r'🔂'),
     ('LOOP_TO', r'⛳'),
@@ -47,7 +47,7 @@ token_type_to_emoji = {
     'NUMBER': 'number',
     'OPERATION': '😍😍|😘🤨|♊|♓|🐜|🐘|🐜🐞|🐘🦣',
     'EXPRESSION': '🤰|🔫',
-    'TERM': '🙅‍♂️|🇦🇴',
+    'TERM': '🙅|🇦🇴',
     'WHILE_LOOP': '🐳',
     'FOR_LOOP': '🔂',
     'LOOP_TO': '⛳',
@@ -109,6 +109,8 @@ class Parser:
             return self.parse_while_loop()
         elif token[0] == 'FOR_LOOP':
             return self.parse_for_loop()
+        elif token[0] == 'IDENTIFIER':
+            return self.parse_variable_assignment()
         else:
             raise RuntimeError(f'Unexpected token: {token}')
 
@@ -121,6 +123,12 @@ class Parser:
         self.consume('ASSIGN')
         value = self.parse_expression()
         return ('variable_declaration', var_type, identifier, value)
+    
+    def parse_variable_assignment(self):
+        identifier = self.consume('IDENTIFIER')
+        self.consume('ASSIGN')
+        value = self.parse_expression()
+        return ('variable_assignment', identifier, value)
 
     def parse_output(self):
         self.consume('OUTPUT')
@@ -203,16 +211,16 @@ class Parser:
 
     def parse_term(self):
         left = self.parse_factor()
-        while self.pos < len(self.tokens) and self.tokens[self.pos][0] == 'OPERATION' and self.tokens[self.pos][1] in {'🤰', '🔫'}:
-            op = self.consume('OPERATION')
+        while self.pos < len(self.tokens) and self.tokens[self.pos][0] == 'EXPRESSION' and self.tokens[self.pos][1] in {'🤰', '🔫'}:
+            op = self.consume('EXPRESSION')
             right = self.parse_factor()
             left = ('operation', left, op, right)
         return left
 
     def parse_factor(self):
         left = self.parse_primary()
-        while self.pos < len(self.tokens) and self.tokens[self.pos][0] == 'OPERATION' and self.tokens[self.pos][1] in {'🙅‍♂️', '🇦🇴'}:
-            op = self.consume('OPERATION')
+        while self.pos < len(self.tokens) and self.tokens[self.pos][0] == 'TERM' and self.tokens[self.pos][1] in {'🙅', '🇦🇴'}:
+            op = self.consume('TERM')
             right = self.parse_primary()
             left = ('operation', left, op, right)
         return left
@@ -259,7 +267,6 @@ class SemanticAnalyzer:
 
     def analyze(self):
         for statement in self.ast:
-            # print(statement)
             self.analyze_statement(statement)
     
     def analyze_body(self, body):
@@ -269,6 +276,8 @@ class SemanticAnalyzer:
     def analyze_statement(self, statement):
         if statement[0] == 'variable_declaration':
             self.analyze_variable_declaration(statement)
+        elif statement[0] == 'variable_assignment':
+            self.analyze_variable_assignment(statement)
         elif statement[0] == 'output':
             self.analyze_output(statement)
         elif statement[0] == 'input':
@@ -296,6 +305,15 @@ class SemanticAnalyzer:
             raise RuntimeError(f'Type error: Expected boolean for variable {identifier}, but got {value_type}')
 
         self.symbol_table[identifier] = value_type
+
+    def analyze_variable_assignment(self, statement):
+        _, identifier, value = statement
+        if identifier not in self.symbol_table:
+            raise RuntimeError(f'Undefined variable: {identifier}')
+        
+        value_type = self.analyze_expression(value)
+        if self.symbol_table[identifier] != value_type:
+            raise RuntimeError(f'Type error: Expected {self.symbol_table[identifier]} for variable {identifier}, but got {value_type}')
 
     def analyze_input(self, statement):
         _, value = statement
@@ -367,7 +385,7 @@ class SemanticAnalyzer:
                     else:
                         raise RuntimeError(f'Type error: Expected number operands for subtraction, but got {left_type} and {right_type}')
                 # *
-                elif op == '🙅‍♂️':
+                elif op == '🙅':
                     if left_type == right_type == 'number':
                         return 'number'
                     else:
@@ -411,6 +429,8 @@ class Transpiler:
     def transpile_statement(self, statement):
         if statement[0] == 'variable_declaration':
             return self.transpile_variable_declaration(statement)
+        elif statement[0] == 'variable_assignment':
+            return self.transpile_variable_assignment(statement)
         elif statement[0] == 'output':
             return self.transpile_output(statement)
         elif statement[0] == 'input':
@@ -428,9 +448,12 @@ class Transpiler:
         _, var_type, identifier, value = statement
         return f'{identifier} = {self.transpile_expression(value)}'
     
+    def transpile_variable_assignment(self, statement):
+        _, identifier, value = statement
+        return f'{identifier} = {self.transpile_expression(value)}'
+    
     def transpile_output(self, statement):
         _, value = statement
-        # print(self.indent_level)
         return f'print({self.transpile_expression(value)})'
     
     def transpile_input(self, statement):
@@ -485,7 +508,7 @@ class Transpiler:
                     '🐘🦣': '>=',
                     '🤰': '+',
                     '🔫': '-',
-                    '🙅‍♂️': '*',
+                    '🙅': '*',
                     '🇦🇴': '/',
                 }
 
@@ -513,10 +536,10 @@ class Transpiler:
 
 parser = argparse.ArgumentParser(description='Transpile Python code and optionally run it.')
 
-parser.add_argument('--in', dest='input_file', default='example.pye', help='Input Python file path (default: example.pye)')
-parser.add_argument('--out', dest='output_file', default='example.py', help='Output transpiled file path (default: example.py)')
-parser.add_argument('--run', action='store_true', help='Run the transpiled code')
-parser.add_argument('--debug', action='store_true', help='Print debug information')
+parser.add_argument('--in', dest='input_file', default='example.pye', help='input Python file path (default: example.pye)')
+parser.add_argument('--out', dest='output_file', default='example.py', help='output transpiled file path (default: example.py)')
+parser.add_argument('--run', action='store_true', help='run the transpiled code')
+parser.add_argument('--debug', action='store_true', help='print debug information')
 
 args = parser.parse_args()
 
