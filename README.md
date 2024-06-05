@@ -153,3 +153,7 @@ Este código em Emojicode gera os primeiros 15 números da sequência de Fibonac
  - [ ] Concatenação de Strings
  - [ ] Melhoria da mensagem de erro com adição da linha
  
+## Equipe:
+- Arthur Oliveira Passos - 1272022772
+- Filipe Souza Alves - 1272023233
+- Kaled Freire Barreto - 1272023144
