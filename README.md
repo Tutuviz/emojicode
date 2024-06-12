@@ -157,3 +157,4 @@ Este código em Emojicode gera os primeiros 15 números da sequência de Fibonac
 - Arthur Oliveira Passos - 1272022772
 - Filipe Souza Alves - 1272023233
 - Kaled Freire Barreto - 1272023144
+- Renan Araujo Sacramento - 12718110016
